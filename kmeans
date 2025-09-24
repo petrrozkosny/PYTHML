@@ -1,0 +1,106 @@
+# Import potřebných knihoven
+import pandas as pd                          # Pro práci s datovými rámci
+import numpy as np                           # Pro numerické operace
+from sklearn.preprocessing import StandardScaler  # Pro standardizaci dat
+from sklearn.cluster import KMeans           # K-Means clustering algoritmus
+import seaborn as sns                        # Pro pokročilou vizualizaci (zde nepoužito)
+from matplotlib import pyplot as plt        # Pro vytváření grafů
+from sklearn.metrics import silhouette_score # Pro evaluaci kvality clusterů
+from mpl_toolkits.mplot3d import Axes3D     # Pro 3D vizualizaci
+
+# Načtení dat ze souboru CSV s čárkou jako separátorem
+df = pd.read_csv("data.csv", sep=",")
+
+# Filtrování dat pouze pro model "Mazda 6" a výběr relevantních sloupců
+# Zachováváme pouze rok, cenu v eurech a nájezd v kilometrech
+df = df.loc[df["model"] == "Mazda 6", ["year", "price_in_euro", "mileage_in_km"]]
+
+# Převod dat na numerické typy s ošetřením chybných hodnot
+# errors="coerce" znamená, že neplatné hodnoty budou převedeny na NaN
+df["year"] = pd.to_numeric(df["year"], errors="coerce")
+df["price_in_euro"] = pd.to_numeric(df["price_in_euro"], errors="coerce")
+df["mileage_in_km"] = pd.to_numeric(df["mileage_in_km"], errors="coerce")
+
+# Odstranění řádků obsahujících chybějící hodnoty (NaN)
+df = df.dropna()
+
+# Příprava dat pro clustering - vytvoření kopie dataframe
+X = df
+
+# Standardizace dat - převod všech proměnných na standardní normální rozdělení
+# Důležité pro K-Means, protože algoritmus je citlivý na škálu dat
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(df)
+
+# Vytvoření hlavního figure objektu pro 4 subploty
+# figsize=(15, 20) nastavuje velikost celého obrázku
+fig = plt.figure(figsize=(15, 20))
+
+# Iterace přes různé počty clusterů (k = 4, 5, 6, 7)
+for i, k in enumerate([4, 5, 6, 7]):
+    # Vytvoření a trénování K-Means modelu
+    # n_clusters=k specifikuje počet clusterů
+    # random_state=42 zajišťuje reproducibilní výsledky
+    model = KMeans(n_clusters=k, random_state=42)
+    
+    # Aplikace clustering algoritmu na standardizovaná data
+    # fit_predict() zároveň natrénuje model a vrátí labels pro každý datový bod
+    labels = model.fit_predict(X_scaled)
+    
+    # Výpočet Silhouette skóre - metrika kvality clusteringu
+    # Hodnoty blízko 1 = dobré clustering, blízko 0 = překrývající se clustery
+    score = silhouette_score(X_scaled, labels)
+    print(f"k={k}, silhouette score: {score:.3f}")
+    
+    # Vytvoření 3D subplotu
+    # 4 řádky, 1 sloupec, pozice i+1, s 3D projekcí
+    ax = fig.add_subplot(4, 1, i+1, projection='3d')
+    
+    # Definice barevné palety pro clustery
+    # viridis je kvalitní barevná mapa, linspace vytvoří k různých barev
+    colors = plt.cm.viridis(np.linspace(0, 1, k))
+    
+    # Vykreslení jednotlivých clusterů
+    # Každý cluster je vykreslen zvlášť pro správné zobrazení legendy
+    for cluster_id in range(k):
+        # Vytvoření masky pro výběr bodů patřících do konkrétního clusteru
+        cluster_mask = labels == cluster_id
+        
+        # 3D scatter plot pro aktuální cluster
+        ax.scatter(df.loc[cluster_mask, 'year'],           # x-osa: rok
+                  df.loc[cluster_mask, 'price_in_euro'],   # y-osa: cena v EUR
+                  df.loc[cluster_mask, 'mileage_in_km'],   # z-osa: nájezd v km
+                  c=[colors[cluster_id]],                  # barva clusteru
+                  alpha=0.7,                               # průhlednost bodů
+                  s=50,                                    # velikost bodů
+                  label=f'Cluster {cluster_id}')          # popisek pro legendu
+    
+    # Přidání center clusterů do grafu
+    # Převod center z standardizovaných hodnot zpět na originální škálu
+    centers = scaler.inverse_transform(model.cluster_centers_)
+    ax.scatter(centers[:, 0],      # x-souřadnice center (rok)
+              centers[:, 1],       # y-souřadnice center (cena)
+              centers[:, 2],       # z-souřadnice center (nájezd)
+              c='red',             # červená barva pro centra
+              marker='x',          # křížkový marker
+              s=200,               # větší velikost
+              linewidths=3,        # tloušťka čar křížku
+              label='Centra clusterů')  # popisek pro legendu
+    
+    # Nastavení popisků os
+    ax.set_xlabel('Rok')
+    ax.set_ylabel('Cena (EUR)')
+    ax.set_zlabel('Nájezd (km)')
+    
+    # Nastavení titulku grafu s informací o počtu clusterů a kvalitě
+    ax.set_title(f'K-Means Clustering (k={k})\nSilhouette Score: {score:.3f}')
+    
+    # Umístění legendy mimo graf pro lepší čitelnost
+    # bbox_to_anchor=(1.05, 1) umístí legendu vpravo od grafu
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+
+# Automatické upravení rozložení subplotů pro zabránění překrývání
+plt.tight_layout()
+
+# Zobrazení všech grafů
+plt.show()
