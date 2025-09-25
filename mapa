@@ -1,0 +1,73 @@
+import json
+import geopandas as gpd
+from shapely.geometry import shape
+
+# Načtení JSON souboru manuálně
+with open('okresy.json', 'r', encoding='utf-8') as f:
+    data = json.load(f)
+
+# Vytvoření seznamu pro GeoDataFrame
+features = []
+if isinstance(data, dict) and 'features' in data:
+    # Pokud je to FeatureCollection
+    for feature in data['features']:
+        geom = shape(feature['geometry'])
+        props = feature.get('properties', {})
+        # Přidáme všechny atributy z feature
+        row = {
+            'geometry': geom,
+            'id': feature.get('id'),
+            'name': feature.get('name'),
+            'nationalCode': feature.get('nationalCode'),
+            'localId': feature.get('localId')
+        }
+        # Přidáme případné properties
+        row.update(props)
+        features.append(row)
+else:
+    # Pokud je to pole features přímo
+    for feature in data:
+        geom = shape(feature['geometry'])
+        row = {
+            'geometry': geom,
+            'id': feature.get('id'),
+            'name': feature.get('name'),
+            'nationalCode': feature.get('nationalCode'),
+            'localId': feature.get('localId')
+        }
+        features.append(row)
+
+# Vytvoření GeoDataFrame
+gdf = gpd.GeoDataFrame(features)
+
+
+gdf = gpd.GeoDataFrame(features)
+
+df1 = df.iloc[:,[0,-1]].copy()
+gdf = pd.merge(
+    gdf, 
+    df1, 
+    left_on="name", 
+    right_on="Okres/Strana (2021)", 
+    how="left"
+)
+
+import matplotlib.pyplot as plt
+
+# Vykreslení
+fig, ax = plt.subplots(1, 1, figsize=(14, 10))
+
+gdf.plot(
+    column='cluster',
+    categorical=True,
+    legend=True,
+    edgecolor='black',
+    linewidth=0.5,
+    ax=ax
+
+)
+
+ax.set_title('Okresy České republiky podle clusterů', fontsize=16, fontweight='bold')
+ax.axis('off')  # skryje osy
+plt.tight_layout()
+plt.show()
