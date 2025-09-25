@@ -1,0 +1,38 @@
+import pandas as pd
+from prophet import Prophet
+from matplotlib import pyplot as plt
+
+url = r"https://raw.githubusercontent.com/petrrozkosny/pydata/refs/heads/main/pydata_data.csv"
+df = pd.read_csv(url, sep=";")
+df["DATE"] = pd.to_datetime(df["DATE"])
+df = df.loc[df["NAME"]== "RUZYNE", ["DATE","TMAX","PRCP"]]
+df = df.dropna()
+df.columns = ["ds","y","PRCP"]
+
+# Model
+model = Prophet(yearly_seasonality=True)
+model.add_regressor("PRCP", prior_scale=10)  # síla vlivu
+model.fit(df)
+
+# Predikce s realistickými srážkami
+future = model.make_future_dataframe(periods=365, freq='D')
+
+# Sezónní průměr srážek
+monthly_prcp = df.groupby(df['ds'].dt.month)['PRCP'].mean()
+future['PRCP'] = future['ds'].dt.month.map(monthly_prcp)
+
+forecast = model.predict(future)
+
+# Vizualizace
+fig = model.plot(forecast)
+plt.title('Predikce TMAX s vlivem srážek')
+plt.show()
+
+# Komponenty včetně vlivu srážek
+fig2 = model.plot_components(forecast)
+plt.show()
+
+# Vliv regresoru
+from prophet.utilities import regressor_coefficients
+print("\nVliv srážek na teplotu:")
+print(regressor_coefficients(model))
